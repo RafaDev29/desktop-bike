@@ -85,19 +85,24 @@ def get_duracion_prestamos():
     duraciones = [row[0] for row in cursor.fetchall()]
     conn.close()
     
-    # Calcular estadísticas descriptivas
     if not duraciones:
         return None
+
+    # Calcular estadísticas descriptivas
+    moda_result = stats.mode(duraciones)
+    # Revisar si moda_result es un arreglo o un valor único
+    moda = moda_result.mode[0] if isinstance(moda_result.mode, np.ndarray) else moda_result.mode
 
     return {
         'media': np.mean(duraciones),
         'mediana': np.median(duraciones),
-        'moda': stats.mode(duraciones)[0][0],
+        'moda': moda,
         'minimo': np.min(duraciones),
         'maximo': np.max(duraciones),
         'desviacion': np.std(duraciones),
         'cuartiles': np.percentile(duraciones, [25, 50, 75])
     }
+
 
 def get_ranking_clientes():
     conn = sqlite3.connect('database/bike_rental.db')
@@ -153,20 +158,23 @@ def get_preferencias_por_color():
 def get_preferencias_por_dia():
     conn = sqlite3.connect('database/bike_rental.db')
     cursor = conn.cursor()
-    
+
+    # Convertir fecha de mm-dd-yyyy a yyyy-mm-dd y luego extraer el día de la semana
     cursor.execute('''
-    SELECT strftime('%w', fecha_prestamo) AS dia_semana, COUNT(*) AS cantidad_prestamos
+    SELECT strftime('%w', substr(fecha_prestamo, 7, 4) || '-' || substr(fecha_prestamo, 1, 2) || '-' || substr(fecha_prestamo, 4, 2)) AS dia_semana, 
+           COUNT(*) AS cantidad_prestamos
     FROM Prestamo
+    WHERE fecha_prestamo IS NOT NULL
     GROUP BY dia_semana
     ORDER BY dia_semana
     ''')
-    
+
     dias = {
         "0": "Domingo", "1": "Lunes", "2": "Martes", "3": "Miércoles",
         "4": "Jueves", "5": "Viernes", "6": "Sábado"
     }
-    
-    preferencias = [(dias[row[0]], row[1]) for row in cursor.fetchall()]
+
+    preferencias = [(dias.get(str(row[0]), "Día desconocido"), row[1]) for row in cursor.fetchall()]
     conn.close()
-    
+
     return preferencias
